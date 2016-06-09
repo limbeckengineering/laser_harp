@@ -2,23 +2,27 @@ import cv2
 import numpy as np 
 from matplotlib import pyplot as plt
 
-#image size from built-in camera:
-    #1280x720
-    #3 colors
-    
-#Harp needs 8 quadrants with gaps in between. This gives the following regions
-    #-100 px regions with 30px gap on all sides
+"""
+To-Do list for the laser tracking -- other scripts will handle motor control 
+    Ã origonal laser tracking
+    x dynamic frame resizing....not critical just nice to have
+    x sliders for testing
+    x "motion" tracking of dots
+    x note mapping (different script??)
+        X different octaves for height
+        x different notes for different lasers
 
-############# Variables #############
+"""
+
+############# Static Variables #############
+#testing variables
 regions = 8
 size = 100 #px
 boundry = 30 #px
-y_position = 720/2 - 80
 
-#image properties
-height = 720 #px
-width = 1280 #px
 
+height = 720
+width = 1280
 
 #rectangles
 rects = [0]*8
@@ -28,30 +32,29 @@ frames = [0]*regions
 
 #frame_area
 frame_area = [0]*regions
-trigger_threshold = 7500; #white pixels
+trigger_threshold = 75; #white pixels
 
 #####################################
 
 #video capture
 cap = cv2.VideoCapture(0)
 
-
-#create image for region bitmasking
-blank_image = np.zeros((height,width,3), np.uint8)
-
 #create rectangles and region mask
 for i in range(0,8):
-    rects[i] = (boundry+i*(size + 2*boundry),y_position,100,100)
+    rects[i] = (boundry+i*(size + 2*boundry),0,size,height)
     
 ###Color Regions
 
 #hsv
-lower_blue = np.array([110,50,50])
-upper_blue = np.array([130,255,255])
-lower_green = np.array([45,100,100])
-upper_green = np.array([75,255,255])
-lower_red = np.array([0,100,100])
-upper_red = np.array([10,255,255])
+hue_min = 20
+hue_max = 160
+sat_min = 100
+sat_max = 255
+val_min = 200
+val_max = 255
+
+
+val_thresh_value = 130
 
 
 #used to check
@@ -66,36 +69,44 @@ while(1):
         #frame = cv2.GaussianBlur(frame,(9,9),0)
         
         #convert from BGR to HSV 
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        
+        h,s,v = cv2.split(frame)
+        
+        
+        dirt1, hue_thresh_max = cv2.threshold(h,hue_max,0,cv2.THRESH_TOZERO_INV)
+        dirt2, sat_thresh_max = cv2.threshold(s,sat_max,0,cv2.THRESH_TOZERO_INV)
+        dirt3, val_thresh_max = cv2.threshold(v,val_max,0,cv2.THRESH_TOZERO_INV)
+        
         
         #mask all colors except for blue (threshold the HSV image)
-        maskblue = cv2.inRange(hsv,lower_blue, upper_blue)
-        maskred = cv2.inRange(hsv, lower_red,upper_red)
-        maskgreen = cv2.inRange(hsv,lower_green,upper_green)
-        color_mask = maskblue
+        dirt4, hue_thresh_min = cv2.threshold(hue_thresh_max,hue_min,255,cv2.THRESH_BINARY)
+        dirt5, sat_thresh_min = cv2.threshold(sat_thresh_max,sat_min,255,cv2.THRESH_BINARY)
+        dirt6, val_thresh_min = cv2.threshold(val_thresh_max,val_min,255,cv2.THRESH_BINARY)
         
         
+        
+        merged_image = cv2.merge([hue_thresh_min,sat_thresh_min,val_thresh_min])
+        merged_image_bgr = cv2.cvtColor(merged_image, cv2.COLOR_HSV2BGR)
+        merged_image_bw = cv2.cvtColor(merged_image_bgr, cv2.COLOR_BGR2GRAY)
+       
         #bitwise_and rectangles and add color mask
-        res = cv2.bitwise_and(frame,frame,mask=color_mask)
+        #res = cv2.bitwise_and(frame,frame,mask=color_mask)
         
-        
-        # Regular Thresholding
-        ret,thresh = cv2.threshold(res,0,255,cv2.THRESH_BINARY)
-        
-        #convert to black&white
-        color = cv2.cvtColor(thresh, cv2.COLOR_HSV2RGB)
-        bw = cv2.cvtColor(thresh,cv2.COLOR_RGB2GRAY)
         
         #create 8 mini-frames
         for i in range(0,len(frames)):
-            frames[i] = bw[(width/2 - size/2):(width/2 + size/2),(boundry+i*160):(boundry+100 + i*160)]
-            frame_area[i] = cv2.countNonZero(frames[i])
+            frames[i] = merged_image_bw[(height/2 - size/2):(height/2 + size/2),(boundry+i*160):(boundry+100 + i*160)]
+            frame_area[i] = cv2.sumElems(frames[i])
+            
     
         #check the threshold pixel area    
         for i in range(len(frame_area)):
-            if frame_area[i] > trigger_threshold:
-                cv2.rectangle(bw,(rects[i][0],rects[i][1]),(rects[i][0] + size,rects[i][1]+size),(255,255,255),3,8,0)
-                print "Drew rectangle"
+            if frame_area[i][0] > 1000000:
+                    cv2.rectangle(merged_image_bw,(rects[i][0],rects[i][1]),(rects[i][0] + size,rects[i][1]+height),(255,255,255),3,8,0)
+                    print "triggered: ", i
+        #print frame_area[3]
+        
         #show images
         cv2.imshow('frame1',frames[0])
         cv2.imshow('frame2',frames[1])
@@ -105,8 +116,10 @@ while(1):
         cv2.imshow('frame6',frames[5])
         cv2.imshow('frame7',frames[6])
         cv2.imshow('frame8',frames[7])
+    
+        #show origonal frame
+        cv2.imshow('merged',merged_image_bw)
         
-        cv2.imshow('fram',bw)
         
         #move images
         cv2.moveWindow('frame2',200,0)
@@ -126,7 +139,9 @@ while(1):
 cv2.destroyAllWindows()
 
 '''
-Created on Nov 13, 2014
+Created on Jun 6, 2016
 
-@author: travislibsack
+@author: Travis Libsack (libsackt@mit.edu)
+@company: Limbeck Engineering
+@license: MIT License
 '''
