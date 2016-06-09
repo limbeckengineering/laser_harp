@@ -4,48 +4,49 @@ from matplotlib import pyplot as plt
 
 """
 To-Do list for the laser tracking -- other scripts will handle motor control 
-    Ã origonal laser tracking
-    x dynamic frame resizing....not critical just nice to have
-    x sliders for testing
+    + laser tracking
+    + dynamic frame resizing....not critical just nice to have
+    - sliders for testing
     x "motion" tracking of dots
     x note mapping (different script??)
         X different octaves for height
         x different notes for different lasers
 
 """
+#video capture
+cap = cv2.VideoCapture(0)
+
+_,frame = cap.read()
+height,width = frame.shape[0:2]
+
 
 ############# Static Variables #############
 #testing variables
 regions = 8
-size = 100 #px
 boundry = 30 #px
-
-
-height = 720
-width = 1280
+size = width/regions - boundry*2
+print size
 
 #rectangles
-rects = [0]*8
+rects = [0]*regions
 
 #induvidual frames
 frames = [0]*regions
 
 #frame_area
-frame_area = [0]*regions
-trigger_threshold = 75; #white pixels
+frame_pixels = [0]*regions
+pixel_trig = 1000000; #white pixels
 
 #####################################
 
-#video capture
-cap = cv2.VideoCapture(0)
 
 #create rectangles and region mask
 for i in range(0,8):
     rects[i] = (boundry+i*(size + 2*boundry),0,size,height)
     
-###Color Regions
 
-#hsv
+#### HSV Color Scheme
+#default HSV values -- change with slider
 hue_min = 20
 hue_max = 160
 sat_min = 100
@@ -54,60 +55,99 @@ val_min = 200
 val_max = 255
 
 
-val_thresh_value = 130
+##Sliders!
 
+#function to be called when the slider interrupt happens...not use
+def slider_call(x):
+    pass
 
-#used to check
-#cv2.imshow('blank',blank_image)      
+slider_window = np.zeros((100,800),np.uint8)
+cv2.namedWindow('Slider Window')
+
+#trackbars!
+cv2.createTrackbar('HUE_min','Slider Window',0,180,slider_call)
+cv2.createTrackbar('HUE_max','Slider Window',0,180,slider_call)
+
+cv2.createTrackbar('SAT_min','Slider Window',0,255,slider_call)
+cv2.createTrackbar('SAT_max','Slider Window',0,255,slider_call)
+
+cv2.createTrackbar('VAL_min','Slider Window',0,255,slider_call)
+cv2.createTrackbar('VAL_min','Slider Window',0,255,slider_call)
+
+#add button to return to defaults
+switch = '0: Default \n1: Mixing'
+cv2.createTrackbar(switch,'Slider Window',0,1,slider_call)
+   
 
 while(1):
-       
-        
+    
+      #capture video
         _, frame = cap.read()
+        
+       #show slider window
+        cv2.imshow('Slider Window', slider_window)
+       
+       
+        #Get Trackbar positions
+        h_min = cv2.getTrackbarPos('HUE_min','Slider Window')
+        h_max = cv2.getTrackbarPos('HUE_max','Slider Window') 
+        s_min = cv2.getTrackbarPos('SAT_min','Slider Window')
+        s_max = cv2.getTrackbarPos('SAT_max','Slider Window')
+        v_min = cv2.getTrackbarPos('VAL_min','Slider Window')
+        v_max = cv2.getTrackbarPos('VAL_max','Slider Window')
+    
+        #get button state
+        s = cv2.getTrackbarPos(switch,'Slider Window');
+    
+        if(s == 0):
+            h_min = hue_min
+            h_max = hue_max
+            s_min = sat_min
+            s_max = sat_max
+            v_min = val_min
+            v_max = val_max
     
         #fix up edges (smooth)
-        #frame = cv2.GaussianBlur(frame,(9,9),0)
+        frame = cv2.GaussianBlur(frame,(9,9),0)
         
         #convert from BGR to HSV 
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         
         h,s,v = cv2.split(frame)
         
-        
-        dirt1, hue_thresh_max = cv2.threshold(h,hue_max,0,cv2.THRESH_TOZERO_INV)
-        dirt2, sat_thresh_max = cv2.threshold(s,sat_max,0,cv2.THRESH_TOZERO_INV)
-        dirt3, val_thresh_max = cv2.threshold(v,val_max,0,cv2.THRESH_TOZERO_INV)
-        
-        
-        #mask all colors except for blue (threshold the HSV image)
-        dirt4, hue_thresh_min = cv2.threshold(hue_thresh_max,hue_min,255,cv2.THRESH_BINARY)
-        dirt5, sat_thresh_min = cv2.threshold(sat_thresh_max,sat_min,255,cv2.THRESH_BINARY)
-        dirt6, val_thresh_min = cv2.threshold(val_thresh_max,val_min,255,cv2.THRESH_BINARY)
+        #threshold the maximum values first
+        dirt, hue_thresh_max = cv2.threshold(h,h_max,0,cv2.THRESH_TOZERO_INV)
+        dirt, sat_thresh_max = cv2.threshold(s,s_max,0,cv2.THRESH_TOZERO_INV)
+        dirt, val_thresh_max = cv2.threshold(v,v_max,0,cv2.THRESH_TOZERO_INV)
         
         
+        #use first imagae in second thresholdin -- filtering algorithm
+        dirt, hue_thresh = cv2.threshold(hue_thresh_max,h_min,255,cv2.THRESH_BINARY)
+        dirt, sat_thresh = cv2.threshold(sat_thresh_max,s_min,255,cv2.THRESH_BINARY)
+        dirt, val_thresh = cv2.threshold(val_thresh_max,v_min,255,cv2.THRESH_BINARY)
         
-        merged_image = cv2.merge([hue_thresh_min,sat_thresh_min,val_thresh_min])
+        
+        #merge images to create entire HSV image
+        merged_image = cv2.merge([hue_thresh,sat_thresh,val_thresh])
+        
+        #convert 3-channel HSV image to a binary bw image
         merged_image_bgr = cv2.cvtColor(merged_image, cv2.COLOR_HSV2BGR)
         merged_image_bw = cv2.cvtColor(merged_image_bgr, cv2.COLOR_BGR2GRAY)
-       
-        #bitwise_and rectangles and add color mask
-        #res = cv2.bitwise_and(frame,frame,mask=color_mask)
-        
         
         #create 8 mini-frames
         for i in range(0,len(frames)):
             frames[i] = merged_image_bw[(height/2 - size/2):(height/2 + size/2),(boundry+i*160):(boundry+100 + i*160)]
-            frame_area[i] = cv2.sumElems(frames[i])
+            frame_pixels[i] = cv2.sumElems(frames[i])
             
     
         #check the threshold pixel area    
-        for i in range(len(frame_area)):
-            if frame_area[i][0] > 1000000:
+        for i in range(len(frame_pixels)):
+            #if large then pixel_trig, draw a rectangle!
+            if frame_pixels[i][0] > pixel_trig:
                     cv2.rectangle(merged_image_bw,(rects[i][0],rects[i][1]),(rects[i][0] + size,rects[i][1]+height),(255,255,255),3,8,0)
                     print "triggered: ", i
-        #print frame_area[3]
         
-        #show images
+        #show individual regions
         cv2.imshow('frame1',frames[0])
         cv2.imshow('frame2',frames[1])
         cv2.imshow('frame3',frames[2])
@@ -117,7 +157,7 @@ while(1):
         cv2.imshow('frame7',frames[6])
         cv2.imshow('frame8',frames[7])
     
-        #show origonal frame
+        #show merged image after filtering -- rectangles added
         cv2.imshow('merged',merged_image_bw)
         
         
@@ -144,4 +184,7 @@ Created on Jun 6, 2016
 @author: Travis Libsack (libsackt@mit.edu)
 @company: Limbeck Engineering
 @license: MIT License
+
+Algorithm/filtering method based off of bradmontgomery's laser dot tracking program
+    https://github.com/bradmontgomery/python-laser-tracker
 '''
