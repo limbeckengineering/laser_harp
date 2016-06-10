@@ -1,3 +1,2 @@
 # laser_harp
-Laser Harp Code 
-This is all the code
+Code for LaserBass -- a laser harp kit for LASER enthusiasts and musicians!
