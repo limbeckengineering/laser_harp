@@ -72,7 +72,7 @@ cv2.createTrackbar('SAT_min','Slider Window',0,255,slider_call)
 cv2.createTrackbar('SAT_max','Slider Window',0,255,slider_call)
 
 cv2.createTrackbar('VAL_min','Slider Window',0,255,slider_call)
-cv2.createTrackbar('VAL_min','Slider Window',0,255,slider_call)
+cv2.createTrackbar('VAL_max','Slider Window',0,255,slider_call)
 
 #add button to return to defaults
 switch = '0: Default \n1: Mixing'
@@ -148,14 +148,14 @@ while(1):
                     print "triggered: ", i
         
         #show individual regions
-        cv2.imshow('frame1',frames[0])
-        cv2.imshow('frame2',frames[1])
-        cv2.imshow('frame3',frames[2])
-        cv2.imshow('frame4',frames[3])
-        cv2.imshow('frame5',frames[4])
-        cv2.imshow('frame6',frames[5])
-        cv2.imshow('frame7',frames[6])
-        cv2.imshow('frame8',frames[7])
+       #cv2.imshow('frame1',frames[0])
+        #cv2.imshow('frame2',frames[1])
+        #cv2.imshow('frame3',frames[2])
+        #cv2.imshow('frame4',frames[3])
+        #cv2.imshow('frame5',frames[4])
+        #cv2.imshow('frame6',frames[5])
+        #cv2.imshow('frame7',frames[6])
+        #cv2.imshow('frame8',frames[7])
     
         #show merged image after filtering -- rectangles added
         cv2.imshow('merged',merged_image_bw)
