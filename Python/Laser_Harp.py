@@ -4,10 +4,11 @@ from matplotlib import pyplot as plt
 
 """
 To-Do list for the laser tracking -- other scripts will handle motor control 
-    + laser tracking
+    + laser imaging
     + dynamic frame resizing....not critical just nice to have
-    - sliders for testing
-    x "motion" tracking of dots
+    + sliders for testing
+    - "motion" tracking of dots
+    x point tracking of laser dots
     x note mapping (different script??)
         X different octaves for height
         x different notes for different lasers
@@ -23,7 +24,7 @@ height,width = frame.shape[0:2]
 ############# Static Variables #############
 #testing variables
 regions = 8
-boundry = 30 #px
+boundry = width/40 #px
 size = width/regions - boundry*2
 print size
 
@@ -36,6 +37,8 @@ frames = [0]*regions
 #frame_area
 frame_pixels = [0]*regions
 pixel_trig = 1000000; #white pixels
+
+point_threshold = 75
 
 #####################################
 
@@ -61,7 +64,18 @@ val_max = 255
 def slider_call(x):
     pass
 
-slider_window = np.zeros((100,800),np.uint8)
+def getpoints(image):
+    points = []
+    retval, threshold = cv2.threshold(image,point_threshold,255,cv2.THRESH_BINARY)
+    
+    #threshold_copy = threshold.copy()
+    
+    contour, hierarchy = cv2.findContours(threshold,cv2.RETR_CCOMP,cv2.CHAIN_APPROX_SIMPLE)
+    points = contour[3]
+    
+    return points
+
+slider_window = np.zeros((100,700),np.uint8)
 cv2.namedWindow('Slider Window')
 
 #trackbars!
@@ -106,7 +120,7 @@ while(1):
             s_max = sat_max
             v_min = val_min
             v_max = val_max
-    
+
         #fix up edges (smooth)
         frame = cv2.GaussianBlur(frame,(9,9),0)
         
@@ -134,41 +148,36 @@ while(1):
         merged_image_bgr = cv2.cvtColor(merged_image, cv2.COLOR_HSV2BGR)
         merged_image_bw = cv2.cvtColor(merged_image_bgr, cv2.COLOR_BGR2GRAY)
         
-        #create 8 mini-frames
-        for i in range(0,len(frames)):
-            frames[i] = merged_image_bw[(height/2 - size/2):(height/2 + size/2),(boundry+i*160):(boundry+100 + i*160)]
-            frame_pixels[i] = cv2.sumElems(frames[i])
-            
-    
-        #check the threshold pixel area    
-        for i in range(len(frame_pixels)):
-            #if large then pixel_trig, draw a rectangle!
-            if frame_pixels[i][0] > pixel_trig:
-                    cv2.rectangle(merged_image_bw,(rects[i][0],rects[i][1]),(rects[i][0] + size,rects[i][1]+height),(255,255,255),3,8,0)
-                    print "triggered: ", i
+        #get points using the function
+        print getpoints(merged_image_bw)
         
-        #show individual regions
-       #cv2.imshow('frame1',frames[0])
-        #cv2.imshow('frame2',frames[1])
-        #cv2.imshow('frame3',frames[2])
-        #cv2.imshow('frame4',frames[3])
-        #cv2.imshow('frame5',frames[4])
-        #cv2.imshow('frame6',frames[5])
-        #cv2.imshow('frame7',frames[6])
-        #cv2.imshow('frame8',frames[7])
-    
+#        #create 8 mini-frames
+#         for i in range(0,len(frames)):
+#              frames[i] = merged_image_bw[(height/2 - size/2):(height/2 + size/2),(boundry+i*160):(boundry+100 + i*160)]
+#              frame_pixels[i] = cv2.sumElems(frames[i])
+#       
+        
+        (minVal, maxVal, minLoc, maxLoc) = cv2.minMaxLoc(merged_image_bw)
+        cv2.circle(merged_image_bw, maxLoc, 100,(255,255,255), 2)
+
+#         #check the threshold pixel area    
+#         for i in range(len(frame_pixels)):
+#             #if large then pixel_trig, draw a rectangle!
+#             if frame_pixels[i][0] > pixel_trig:
+#                     cv2.rectangle(merged_image_bw,(rects[i][0],rects[i][1]),(rects[i][0] + size,rects[i][1]+height),(255,255,255),3,8,0)
+#                     print "triggered: ", i
+                    
         #show merged image after filtering -- rectangles added
         cv2.imshow('merged',merged_image_bw)
         
-        
         #move images
-        cv2.moveWindow('frame2',200,0)
-        cv2.moveWindow('frame3',400,0)
-        cv2.moveWindow('frame4',600,0)
-        cv2.moveWindow('frame5',800,0)
-        cv2.moveWindow('frame6',1000,0)
-        cv2.moveWindow('frame7',1000,135)
-        cv2.moveWindow('frame8',1000,260)
+#         cv2.moveWindow('frame2',200,0)
+#         cv2.moveWindow('frame3',400,0)
+#         cv2.moveWindow('frame4',600,0)
+#         cv2.moveWindow('frame5',800,0)
+#         cv2.moveWindow('frame6',1000,0)
+#         cv2.moveWindow('frame7',1000,135)
+#         cv2.moveWindow('frame8',1000,260)
         
         #breaking from for loop (press ESC)
         k = cv2.waitKey(5) & 0xFF
@@ -177,6 +186,7 @@ while(1):
     
 
 cv2.destroyAllWindows()
+
 
 '''
 Created on Jun 6, 2016
@@ -187,4 +197,7 @@ Created on Jun 6, 2016
 
 Algorithm/filtering method based off of bradmontgomery's laser dot tracking program
     https://github.com/bradmontgomery/python-laser-tracker
+    
+Also contour tracking idea taken from the openlase project
+    https://github.com/marcan/openlase
 '''
